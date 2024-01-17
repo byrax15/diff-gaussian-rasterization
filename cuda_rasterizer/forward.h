@@ -3,7 +3,7 @@
  * GRAPHDECO research group, https://team.inria.fr/graphdeco
  * All rights reserved.
  *
- * This software is free for non-commercial, research and evaluation use 
+ * This software is free for non-commercial, research and evaluation use
  * under the terms of the LICENSE.md file.
  *
  * For inquiries contact  george.drettakis@inria.fr
@@ -47,8 +47,9 @@ namespace FORWARD
 		uint32_t* tiles_touched,
 		bool prefiltered,
 		int2* rects,
-		float3 boxmin,
-		float3 boxmax);
+		const float3* boxmin,
+		const float3* boxmax,
+		int boxcount);
 
 	// Main rasterization method.
 	void render(

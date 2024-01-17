@@ -3,7 +3,7 @@
  * GRAPHDECO research group, https://team.inria.fr/graphdeco
  * All rights reserved.
  *
- * This software is free for non-commercial, research and evaluation use 
+ * This software is free for non-commercial, research and evaluation use
  * under the terms of the LICENSE.md file.
  *
  * For inquiries contact  george.drettakis@inria.fr
@@ -89,7 +89,7 @@ __global__ void duplicateWithKeys(
 		uint32_t off = (idx == 0) ? 0 : offsets[idx - 1];
 		uint2 rect_min, rect_max;
 
-		if(rects == nullptr)
+		if (rects == nullptr)
 			getRect(points_xy[idx], radii[idx], rect_min, rect_max, grid);
 		else
 			getRect(points_xy[idx], rects[idx], rect_min, rect_max, grid);
@@ -222,8 +222,9 @@ int CudaRasterizer::Rasterizer::forward(
 	float* out_color,
 	int* radii,
 	int* rects,
-	float* boxmin,
-	float* boxmax)
+	const float* boxmin,
+	const float* boxmax,
+	int boxcount)
 {
 	const float focal_y = height / (2.0f * tan_fovy);
 	const float focal_x = width / (2.0f * tan_fovx);
@@ -250,13 +251,13 @@ int CudaRasterizer::Rasterizer::forward(
 		throw std::runtime_error("For non-RGB, provide precomputed Gaussian colors!");
 	}
 
-	float3 minn = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
-	float3 maxx = { FLT_MAX, FLT_MAX, FLT_MAX };
-	if (boxmin != nullptr)
-	{
-		minn = *((float3*)boxmin);
-		maxx = *((float3*)boxmax);
-	}
+	if (boxcount < 0)
+		throw std::runtime_error("Trying to use a negative number of cull box (boxcount < 0)");
+	const float3 minn = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
+	const float3 maxx = { FLT_MAX, FLT_MAX, FLT_MAX };
+
+	const float3* min_ptr = boxcount == 0 || boxmin ? &minn : reinterpret_cast<const float3*>(boxmin);
+	const float3* max_ptr = boxcount == 0 || boxmax ? &maxx : reinterpret_cast<const float3*>(boxmax);
 
 	// Run preprocessing per-Gaussian (transformation, bounding, conversion of SHs to RGB)
 	FORWARD::preprocess(
@@ -285,8 +286,9 @@ int CudaRasterizer::Rasterizer::forward(
 		geomState.tiles_touched,
 		prefiltered,
 		(int2*)rects,
-		minn,
-		maxx
+		min_ptr,
+		max_ptr,
+		boxcount
 	);
 
 	// Compute prefix sum over full list of touched tile counts by Gaussians

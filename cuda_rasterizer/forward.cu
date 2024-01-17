@@ -3,7 +3,7 @@
  * GRAPHDECO research group, https://team.inria.fr/graphdeco
  * All rights reserved.
  *
- * This software is free for non-commercial, research and evaluation use 
+ * This software is free for non-commercial, research and evaluation use
  * under the terms of the LICENSE.md file.
  *
  * For inquiries contact  george.drettakis@inria.fr
@@ -179,8 +179,10 @@ __global__ void preprocessCUDA(int P, int D, int M,
 	uint32_t* tiles_touched,
 	bool prefiltered,
 	int2* rects,
-	float3 boxmin,
-	float3 boxmax)
+	const float3* boxmin,
+	const float3* boxmax,
+	int boxcount
+)
 {
 	auto idx = cg::this_grid().thread_rank();
 	if (idx >= P)
@@ -199,9 +201,13 @@ __global__ void preprocessCUDA(int P, int D, int M,
 	// Transform point by projecting
 	float3 p_orig = { orig_points[3 * idx], orig_points[3 * idx + 1], orig_points[3 * idx + 2] };
 
-	if (p_orig.x < boxmin.x || p_orig.y < boxmin.y || p_orig.z < boxmin.z ||
-		p_orig.x > boxmax.x || p_orig.y > boxmax.y || p_orig.z > boxmax.z)
-		return;
+	for (int i = 0; i < boxcount; ++i) {
+		const auto& min = boxmin[i];
+		const auto& max = boxmax[i];
+		if (p_orig.x < min.x || p_orig.y < min.y || p_orig.z < min.z ||
+			p_orig.x > max.x || p_orig.y > max.y || p_orig.z > max.z)
+			return;
+	}
 
 	float4 p_hom = transformPoint4x4(p_orig, projmatrix);
 	float p_w = 1.0f / (p_hom.w + 0.0000001f);
@@ -279,7 +285,7 @@ __global__ void preprocessCUDA(int P, int D, int M,
 // block, each thread treats one pixel. Alternates between fetching 
 // and rasterizing data.
 template <uint32_t CHANNELS>
-__global__ void __launch_bounds__(BLOCK_X * BLOCK_Y)
+__global__ void __launch_bounds__(BLOCK_X* BLOCK_Y)
 renderCUDA(
 	const uint2* __restrict__ ranges,
 	const uint32_t* __restrict__ point_list,
@@ -302,7 +308,7 @@ renderCUDA(
 	float2 pixf = { (float)pix.x, (float)pix.y };
 
 	// Check if this thread is associated with a valid pixel or outside.
-	bool inside = pix.x < W&& pix.y < H;
+	bool inside = pix.x < W && pix.y < H;
 	// Done threads can help with fetching, but don't rasterize
 	bool done = !inside;
 
@@ -445,8 +451,10 @@ void FORWARD::preprocess(int P, int D, int M,
 	uint32_t* tiles_touched,
 	bool prefiltered,
 	int2* rects,
-	float3 boxmin,
-	float3 boxmax)
+	const float3* boxmin,
+	const float3* boxmax,
+	int boxcount
+)
 {
 	preprocessCUDA<NUM_CHANNELS> << <(P + 255) / 256, 256 >> > (
 		P, D, M,
@@ -459,7 +467,7 @@ void FORWARD::preprocess(int P, int D, int M,
 		clamped,
 		cov3D_precomp,
 		colors_precomp,
-		viewmatrix, 
+		viewmatrix,
 		projmatrix,
 		cam_pos,
 		W, H,
@@ -476,6 +484,7 @@ void FORWARD::preprocess(int P, int D, int M,
 		prefiltered,
 		rects,
 		boxmin,
-		boxmax
+		boxmax,
+		boxcount
 		);
 }

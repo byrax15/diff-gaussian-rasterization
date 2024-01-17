@@ -51,8 +51,9 @@ namespace CudaRasterizer
 			float* out_color,
 			int* radii = nullptr,
 			int* rects = nullptr,
-			float* boxmin = nullptr,
-			float* boxmax = nullptr);
+			const float* boxmin = nullptr,
+			const float* boxmax = nullptr,
+			int boxcount = 0);
 
 		static void backward(
 			const int P, int D, int M, int R,
