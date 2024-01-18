@@ -151,6 +151,7 @@ __device__ void computeCov3D(const glm::vec3 scale, float mod, const glm::vec4 r
 	cov3D[5] = Sigma[2][2];
 }
 
+using FORWARD::CullOperator;
 // Perform initial steps for each Gaussian prior to rasterization.
 template<int C>
 __global__ void preprocessCUDA(int P, int D, int M,
@@ -179,9 +180,10 @@ __global__ void preprocessCUDA(int P, int D, int M,
 	uint32_t* tiles_touched,
 	bool prefiltered,
 	int2* rects,
+	int boxcount,
 	const float3* boxmin,
 	const float3* boxmax,
-	int boxcount
+	CullOperator op
 )
 {
 	auto idx = cg::this_grid().thread_rank();
@@ -200,14 +202,31 @@ __global__ void preprocessCUDA(int P, int D, int M,
 
 	// Transform point by projecting
 	float3 p_orig = { orig_points[3 * idx], orig_points[3 * idx + 1], orig_points[3 * idx + 2] };
+	const auto outside_box = [p_orig](float3 min, float3 max)
+		{
+			return p_orig.x < min.x || p_orig.y < min.y || p_orig.z < min.z || p_orig.x > max.x || p_orig.y > max.y || p_orig.z > max.z;
+		};
 
-	for (int i = 0; i < boxcount; ++i) {
-		const auto& min = boxmin[i];
-		const auto& max = boxmax[i];
-		if (p_orig.x < min.x || p_orig.y < min.y || p_orig.z < min.z ||
-			p_orig.x > max.x || p_orig.y > max.y || p_orig.z > max.z)
-			return;
+	bool culled = outside_box(boxmin[0], boxmax[0]);
+#define CULL_LOOP(Operator) \
+	for (int i = 1; i < boxcount; ++i) { culled Operator= outside_box(boxmin[i], boxmax[i]); }
+
+	switch (op) {
+	case CullOperator::AND:
+		CULL_LOOP(&);
+		break;
+	case CullOperator::OR:
+		CULL_LOOP(| );
+		break;
+	case CullOperator::XOR:
+		CULL_LOOP(^);
+		break;
 	}
+#undef CULL_LOOP(Operator)
+
+	if (culled)
+		return;
+
 
 	float4 p_hom = transformPoint4x4(p_orig, projmatrix);
 	float p_w = 1.0f / (p_hom.w + 0.0000001f);
@@ -453,7 +472,8 @@ void FORWARD::preprocess(int P, int D, int M,
 	int2* rects,
 	int boxcount,
 	const float3* boxmin,
-	const float3* boxmax
+	const float3* boxmax,
+	FORWARD::CullOperator cullop
 )
 {
 	preprocessCUDA<NUM_CHANNELS> << <(P + 255) / 256, 256 >> > (
@@ -483,8 +503,9 @@ void FORWARD::preprocess(int P, int D, int M,
 		tiles_touched,
 		prefiltered,
 		rects,
+		boxcount,
 		boxmin,
 		boxmax,
-		boxcount
-		);
+		cullop
+	);
 }

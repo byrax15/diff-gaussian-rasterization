@@ -14,6 +14,7 @@
 
 #include <vector>
 #include <functional>
+#include <CullOperator.h>
 
 namespace CudaRasterizer
 {
@@ -53,7 +54,8 @@ namespace CudaRasterizer
 			int* rects = nullptr,
 			int boxcount = 0,
 			const float* boxmin = nullptr,
-			const float* boxmax = nullptr
+			const float* boxmax = nullptr,
+			FORWARD::CullOperator cullop = FORWARD::CullOperator::AND
 		);
 
 		static void backward(

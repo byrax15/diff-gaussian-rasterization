@@ -224,8 +224,9 @@ int CudaRasterizer::Rasterizer::forward(
 	int* rects,
 	int boxcount,
 	const float* boxmin,
-	const float* boxmax)
-{
+	const float* boxmax,
+	FORWARD::CullOperator cullop
+) {
 	const float focal_y = height / (2.0f * tan_fovy);
 	const float focal_x = width / (2.0f * tan_fovx);
 
@@ -290,7 +291,8 @@ int CudaRasterizer::Rasterizer::forward(
 		(int2*)rects,
 		boxcount,
 		&minn,
-		&maxx
+		&maxx,
+		cullop
 	);
 	else FORWARD::preprocess(
 		P, D, M,
@@ -320,8 +322,9 @@ int CudaRasterizer::Rasterizer::forward(
 		(int2*)rects,
 		boxcount,
 		reinterpret_cast<const float3*>(boxmin),
-		reinterpret_cast<const float3*>(boxmax)
-		);
+		reinterpret_cast<const float3*>(boxmax),
+		cullop
+	);
 
 
 	// Compute prefix sum over full list of touched tile counts by Gaussians

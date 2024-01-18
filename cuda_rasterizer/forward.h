@@ -17,6 +17,7 @@
 #include "device_launch_parameters.h"
 #define GLM_FORCE_CUDA
 #include <glm/glm.hpp>
+#include <CullOperator.h>
 
 namespace FORWARD
 {
@@ -49,7 +50,8 @@ namespace FORWARD
 		int2* rects,
 		int boxcount,
 		const float3* boxmin,
-		const float3* boxmax
+		const float3* boxmax,
+		CullOperator culloperator
 	);
 
 	// Main rasterization method.
