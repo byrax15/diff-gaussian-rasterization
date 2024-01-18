@@ -256,8 +256,8 @@ int CudaRasterizer::Rasterizer::forward(
 	const float3 minn = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
 	const float3 maxx = { FLT_MAX, FLT_MAX, FLT_MAX };
 
-	const float3* min_ptr = (boxcount == 0 || boxmin) ? &minn : reinterpret_cast<const float3*>(boxmin);
-	const float3* max_ptr = (boxcount == 0 || boxmax) ? &maxx : reinterpret_cast<const float3*>(boxmax);
+	const float3* min_ptr = (boxcount == 0 || !boxmin) ? &minn : reinterpret_cast<const float3*>(boxmin);
+	const float3* max_ptr = (boxcount == 0 || !boxmax) ? &maxx : reinterpret_cast<const float3*>(boxmax);
 
 	// Run preprocessing per-Gaussian (transformation, bounding, conversion of SHs to RGB)
 	FORWARD::preprocess(
