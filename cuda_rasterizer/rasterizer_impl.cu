@@ -222,9 +222,9 @@ int CudaRasterizer::Rasterizer::forward(
 	float* out_color,
 	int* radii,
 	int* rects,
+	int boxcount,
 	const float* boxmin,
-	const float* boxmax,
-	int boxcount)
+	const float* boxmax)
 {
 	const float focal_y = height / (2.0f * tan_fovy);
 	const float focal_x = width / (2.0f * tan_fovx);
@@ -253,14 +253,16 @@ int CudaRasterizer::Rasterizer::forward(
 
 	if (boxcount < 0)
 		throw std::runtime_error("Trying to use a negative number of cull box (boxcount < 0)");
+	else if (!boxmin)
+		throw std::runtime_error("boxmin null while asking for non-zero boxcount");
+	else if (!boxmax)
+		throw std::runtime_error("boxmax null while asking for non-zero boxcount");
+
 	const float3 minn = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
 	const float3 maxx = { FLT_MAX, FLT_MAX, FLT_MAX };
 
-	const float3* min_ptr = (boxcount == 0 || !boxmin) ? &minn : reinterpret_cast<const float3*>(boxmin);
-	const float3* max_ptr = (boxcount == 0 || !boxmax) ? &maxx : reinterpret_cast<const float3*>(boxmax);
-
 	// Run preprocessing per-Gaussian (transformation, bounding, conversion of SHs to RGB)
-	FORWARD::preprocess(
+	if (boxcount == 0)	FORWARD::preprocess(
 		P, D, M,
 		means3D,
 		(glm::vec3*)scales,
@@ -286,10 +288,41 @@ int CudaRasterizer::Rasterizer::forward(
 		geomState.tiles_touched,
 		prefiltered,
 		(int2*)rects,
-		min_ptr,
-		max_ptr,
-		boxcount
+		boxcount,
+		&minn,
+		&maxx
 	);
+	else FORWARD::preprocess(
+		P, D, M,
+		means3D,
+		(glm::vec3*)scales,
+		scale_modifier,
+		(glm::vec4*)rotations,
+		opacities,
+		shs,
+		geomState.clamped,
+		cov3D_precomp,
+		colors_precomp,
+		viewmatrix, projmatrix,
+		(glm::vec3*)cam_pos,
+		width, height,
+		focal_x, focal_y,
+		tan_fovx, tan_fovy,
+		radii,
+		geomState.means2D,
+		geomState.depths,
+		geomState.cov3D,
+		geomState.rgb,
+		geomState.conic_opacity,
+		tile_grid,
+		geomState.tiles_touched,
+		prefiltered,
+		(int2*)rects,
+		boxcount,
+		reinterpret_cast<const float3*>(boxmin),
+		reinterpret_cast<const float3*>(boxmax)
+		);
+
 
 	// Compute prefix sum over full list of touched tile counts by Gaussians
 	// E.g., [2, 3, 0, 2, 1] -> [2, 5, 5, 7, 8]

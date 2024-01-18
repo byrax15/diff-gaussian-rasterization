@@ -451,9 +451,9 @@ void FORWARD::preprocess(int P, int D, int M,
 	uint32_t* tiles_touched,
 	bool prefiltered,
 	int2* rects,
+	int boxcount,
 	const float3* boxmin,
-	const float3* boxmax,
-	int boxcount
+	const float3* boxmax
 )
 {
 	preprocessCUDA<NUM_CHANNELS> << <(P + 255) / 256, 256 >> > (

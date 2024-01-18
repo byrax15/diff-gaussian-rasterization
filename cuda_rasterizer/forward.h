@@ -47,9 +47,10 @@ namespace FORWARD
 		uint32_t* tiles_touched,
 		bool prefiltered,
 		int2* rects,
+		int boxcount,
 		const float3* boxmin,
-		const float3* boxmax,
-		int boxcount);
+		const float3* boxmax
+	);
 
 	// Main rasterization method.
 	void render(
