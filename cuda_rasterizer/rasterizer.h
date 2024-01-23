@@ -55,7 +55,7 @@ namespace CudaRasterizer
 			int boxcount = 0,
 			const float* boxmin = nullptr,
 			const float* boxmax = nullptr,
-			FORWARD::CullOperator cullop = FORWARD::CullOperator::AND
+			FORWARD::Cull::Operator cullop = FORWARD::Cull::Operator::AND
 		);
 
 		static void backward(

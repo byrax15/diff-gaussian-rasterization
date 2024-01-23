@@ -225,7 +225,7 @@ int CudaRasterizer::Rasterizer::forward(
 	int boxcount,
 	const float* boxmin,
 	const float* boxmax,
-	FORWARD::CullOperator cullop
+	FORWARD::Cull::Operator cullop
 ) {
 	const float focal_y = height / (2.0f * tan_fovy);
 	const float focal_x = width / (2.0f * tan_fovx);

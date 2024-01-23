@@ -151,7 +151,7 @@ __device__ void computeCov3D(const glm::vec3 scale, float mod, const glm::vec4 r
 	cov3D[5] = Sigma[2][2];
 }
 
-using FORWARD::CullOperator;
+using FORWARD::Cull::Operator;
 // Perform initial steps for each Gaussian prior to rasterization.
 template<int C>
 __global__ void preprocessCUDA(int P, int D, int M,
@@ -183,7 +183,7 @@ __global__ void preprocessCUDA(int P, int D, int M,
 	int boxcount,
 	const float3* boxmin,
 	const float3* boxmax,
-	CullOperator op
+	Operator op
 )
 {
 	auto idx = cg::this_grid().thread_rank();
@@ -212,13 +212,13 @@ __global__ void preprocessCUDA(int P, int D, int M,
 	for (int i = 1; i < boxcount; ++i) { culled Operator= outside_box(boxmin[i], boxmax[i]); }
 
 	switch (op) {
-	case CullOperator::AND:
+	case Operator::AND:
 		CULL_LOOP(&);
 		break;
-	case CullOperator::OR:
+	case Operator::OR:
 		CULL_LOOP(| );
 		break;
-	case CullOperator::XOR:
+	case Operator::XOR:
 		CULL_LOOP(^);
 		break;
 	}
@@ -473,7 +473,7 @@ void FORWARD::preprocess(int P, int D, int M,
 	int boxcount,
 	const float3* boxmin,
 	const float3* boxmax,
-	FORWARD::CullOperator cullop
+	FORWARD::Cull::Operator cullop
 )
 {
 	preprocessCUDA<NUM_CHANNELS> << <(P + 255) / 256, 256 >> > (

@@ -51,7 +51,7 @@ namespace FORWARD
 		int boxcount,
 		const float3* boxmin,
 		const float3* boxmax,
-		CullOperator culloperator
+		Cull::Operator culloperator
 	);
 
 	// Main rasterization method.
