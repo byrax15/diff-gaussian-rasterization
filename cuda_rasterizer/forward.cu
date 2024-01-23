@@ -202,14 +202,14 @@ __global__ void preprocessCUDA(int P, int D, int M,
 
 	// Transform point by projecting
 	float3 p_orig = { orig_points[3 * idx], orig_points[3 * idx + 1], orig_points[3 * idx + 2] };
-	const auto outside_box = [p_orig](float3 min, float3 max)
+	const auto inside_box = [p_orig](float3 min, float3 max)
 		{
-			return p_orig.x < min.x || p_orig.y < min.y || p_orig.z < min.z || p_orig.x > max.x || p_orig.y > max.y || p_orig.z > max.z;
+			return !(p_orig.x < min.x || p_orig.y < min.y || p_orig.z < min.z || p_orig.x > max.x || p_orig.y > max.y || p_orig.z > max.z);
 		};
 
-	bool culled = outside_box(boxmin[0], boxmax[0]);
+	bool inside = inside_box(boxmin[0], boxmax[0]);
 #define CULL_LOOP(Operator) \
-	for (int i = 1; i < boxcount; ++i) { culled Operator= outside_box(boxmin[i], boxmax[i]); }
+	for (int i = 1; i < boxcount; ++i) { inside Operator= inside_box(boxmin[i], boxmax[i]); }
 
 	switch (op) {
 	case Operator::AND:
@@ -224,7 +224,7 @@ __global__ void preprocessCUDA(int P, int D, int M,
 	}
 #undef CULL_LOOP(Operator)
 
-	if (culled)
+	if (!inside)
 		return;
 
 
@@ -507,5 +507,5 @@ void FORWARD::preprocess(int P, int D, int M,
 		boxmin,
 		boxmax,
 		cullop
-	);
+		);
 }
