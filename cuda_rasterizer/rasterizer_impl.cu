@@ -254,10 +254,12 @@ int CudaRasterizer::Rasterizer::forward(
 
 	if (boxcount < 0)
 		throw std::runtime_error("Trying to use a negative number of cull box (boxcount < 0)");
-	else if (!boxmin)
-		throw std::runtime_error("boxmin null while asking for non-zero boxcount");
-	else if (!boxmax)
-		throw std::runtime_error("boxmax null while asking for non-zero boxcount");
+	else if (boxcount > 0) {
+		if (!boxmin)
+			throw std::runtime_error("boxmin null while asking for non-zero boxcount");
+		if (!boxmax)
+			throw std::runtime_error("boxmax null while asking for non-zero boxcount");
+	}
 
 	// Run preprocessing per-Gaussian (transformation, bounding, conversion of SHs to RGB)
 	if (boxcount == 0) {
@@ -294,7 +296,7 @@ int CudaRasterizer::Rasterizer::forward(
 			&maxx,
 			cullop
 		);
-	}	
+	}
 	else FORWARD::preprocess(
 		P, D, M,
 		means3D,
