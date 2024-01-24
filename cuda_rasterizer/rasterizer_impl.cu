@@ -259,41 +259,42 @@ int CudaRasterizer::Rasterizer::forward(
 	else if (!boxmax)
 		throw std::runtime_error("boxmax null while asking for non-zero boxcount");
 
-	const float3 minn = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
-	const float3 maxx = { FLT_MAX, FLT_MAX, FLT_MAX };
-
 	// Run preprocessing per-Gaussian (transformation, bounding, conversion of SHs to RGB)
-	if (boxcount == 0)	FORWARD::preprocess(
-		P, D, M,
-		means3D,
-		(glm::vec3*)scales,
-		scale_modifier,
-		(glm::vec4*)rotations,
-		opacities,
-		shs,
-		geomState.clamped,
-		cov3D_precomp,
-		colors_precomp,
-		viewmatrix, projmatrix,
-		(glm::vec3*)cam_pos,
-		width, height,
-		focal_x, focal_y,
-		tan_fovx, tan_fovy,
-		radii,
-		geomState.means2D,
-		geomState.depths,
-		geomState.cov3D,
-		geomState.rgb,
-		geomState.conic_opacity,
-		tile_grid,
-		geomState.tiles_touched,
-		prefiltered,
-		(int2*)rects,
-		boxcount,
-		&minn,
-		&maxx,
-		cullop
-	);
+	if (boxcount == 0) {
+		const float3 minn = { -FLT_MAX, -FLT_MAX, -FLT_MAX };
+		const float3 maxx = { FLT_MAX, FLT_MAX, FLT_MAX };
+		FORWARD::preprocess(
+			P, D, M,
+			means3D,
+			(glm::vec3*)scales,
+			scale_modifier,
+			(glm::vec4*)rotations,
+			opacities,
+			shs,
+			geomState.clamped,
+			cov3D_precomp,
+			colors_precomp,
+			viewmatrix, projmatrix,
+			(glm::vec3*)cam_pos,
+			width, height,
+			focal_x, focal_y,
+			tan_fovx, tan_fovy,
+			radii,
+			geomState.means2D,
+			geomState.depths,
+			geomState.cov3D,
+			geomState.rgb,
+			geomState.conic_opacity,
+			tile_grid,
+			geomState.tiles_touched,
+			prefiltered,
+			(int2*)rects,
+			1,
+			&minn,
+			&maxx,
+			cullop
+		);
+	}	
 	else FORWARD::preprocess(
 		P, D, M,
 		means3D,
