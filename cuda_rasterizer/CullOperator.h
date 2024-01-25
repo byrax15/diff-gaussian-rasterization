@@ -1,7 +1,7 @@
 #pragma once
 #include <array>
 #include <type_traits>
-#include "host_defines.h"
+#include "cuda_runtime.h"
 
 namespace FORWARD {
 	namespace Cull {
@@ -9,7 +9,7 @@ namespace FORWARD {
 		constexpr std::array<const char*, 3> Names{ "AND" , "OR", "XOR" };
 
 		template<typename TComponent>
-		using vec_component = std::is_same<std::decay<TComponent>::type, float>;
+		using vec_component = std::is_same<typename std::decay<TComponent>::type, float>;
 
 #define assert_vec(VecLike) \
 			static_assert(vec_component<decltype(VecLike::x)>::value \
@@ -29,12 +29,12 @@ namespace FORWARD {
 
 		template<typename VecLike>
 		__host__ __device__ inline constexpr auto IsCulledByBoxes(
-			VecLike const* const boxmin, VecLike const* const boxmax, int boxcount, 
+			VecLike const* const boxmin, VecLike const* const boxmax, int boxcount,
 			Operator op, decltype(MakeInsideBoxLambda<VecLike>(VecLike{})) inside_box)
 		{
 			assert_vec(VecLike);
 
-			if (boxcount == 0) 
+			if (boxcount == 0)
 				return false;
 
 			bool inside = inside_box(boxmin[0], boxmax[0]);
@@ -59,4 +59,3 @@ namespace FORWARD {
 		}
 	}
 }
-
