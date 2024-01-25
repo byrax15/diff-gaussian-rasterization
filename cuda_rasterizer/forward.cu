@@ -151,7 +151,7 @@ __device__ void computeCov3D(const glm::vec3 scale, float mod, const glm::vec4 r
 	cov3D[5] = Sigma[2][2];
 }
 
-using FORWARD::Cull::Operator;
+using namespace FORWARD::Cull;
 // Perform initial steps for each Gaussian prior to rasterization.
 template<int C>
 __global__ void preprocessCUDA(int P, int D, int M,
@@ -202,29 +202,7 @@ __global__ void preprocessCUDA(int P, int D, int M,
 
 	// Transform point by projecting
 	float3 p_orig = { orig_points[3 * idx], orig_points[3 * idx + 1], orig_points[3 * idx + 2] };
-	const auto inside_box = [p_orig](float3 min, float3 max)
-		{
-			return !(p_orig.x < min.x || p_orig.y < min.y || p_orig.z < min.z || p_orig.x > max.x || p_orig.y > max.y || p_orig.z > max.z);
-		};
-
-	bool inside = inside_box(boxmin[0], boxmax[0]);
-#define CULL_LOOP(Operator) \
-	for (int i = 1; i < boxcount; ++i) { inside Operator= inside_box(boxmin[i], boxmax[i]); }
-
-	switch (op) {
-	case Operator::AND:
-		CULL_LOOP(&);
-		break;
-	case Operator::OR:
-		CULL_LOOP(| );
-		break;
-	case Operator::XOR:
-		CULL_LOOP(^);
-		break;
-	}
-#undef CULL_LOOP(Operator)
-
-	if (!inside)
+	if (IsCulledByBoxes(boxmin, boxmax, boxcount, op, MakeInsideBoxLambda(p_orig)))
 		return;
 
 
