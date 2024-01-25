@@ -40,17 +40,17 @@ namespace FORWARD {
 			bool inside = inside_box(boxmin[0], boxmax[0]);
 			switch (op) {
 			case Operator::AND:
-				for (int i = 0; i < boxcount; ++i) {
+				for (int i = 1; i < boxcount; ++i) {
 					inside &= inside_box(boxmin[i], boxmax[i]);
 				}
 				break;
 			case Operator::OR:
-				for (int i = 0; i < boxcount; ++i) {
+				for (int i = 1; i < boxcount; ++i) {
 					inside |= inside_box(boxmin[i], boxmax[i]);
 				}
 				break;
 			case Operator::XOR:
-				for (int i = 0; i < boxcount; ++i) {
+				for (int i = 1; i < boxcount; ++i) {
 					inside ^= inside_box(boxmin[i], boxmax[i]);
 				}
 				break;
