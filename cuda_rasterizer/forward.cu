@@ -202,7 +202,7 @@ __global__ void preprocessCUDA(int P, int D, int M,
 
 	// Transform point by projecting
 	float3 p_orig = { orig_points[3 * idx], orig_points[3 * idx + 1], orig_points[3 * idx + 2] };
-	if (IsCulledByBoxes(boxmin, boxmax, boxcount, op, MakeInsideBoxLambda(p_orig)))
+	if (IsCulledByBoxes(p_orig, boxmin, boxmax, boxcount, op))
 		return;
 
 
