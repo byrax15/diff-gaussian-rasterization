@@ -6,8 +6,38 @@
 
 namespace FORWARD {
 	namespace Cull {
-		enum class Operator { AND, OR, XOR };
-		constexpr std::array<const char*, 3> Names{ "AND" , "OR", "XOR" };
+		class Operator {
+			using Reducer = void(*)(bool&, bool);
+
+		public:
+			enum Value { AND, OR, XOR };
+			static constexpr std::array<const char*, 3> Names{ "AND" , "OR", "XOR" };
+
+			__host__ __device__ constexpr Operator(Value v) : v(v), r(PickReducer()) {}
+
+			__host__ __device__ inline constexpr explicit operator Value() const { return v; }
+
+			__host__ __device__ inline constexpr void Reduce(bool& sum, bool next) const { return r(sum, next); }
+		private:
+			__host__ __device__ inline constexpr Reducer PickReducer() {
+				switch (v) {
+				case Operator::AND:
+					return ReduceAND;
+				case Operator::OR:
+					return ReduceOR;
+				case Operator::XOR:
+					return ReduceXOR;
+				}
+			}
+
+			__host__ __device__ static inline constexpr void ReduceAND(bool& sum, bool next) { sum &= next; }
+			__host__ __device__ static inline constexpr void ReduceOR(bool& sum, bool next) { sum |= next; }
+			__host__ __device__ static inline constexpr void ReduceXOR(bool& sum, bool next) { sum ^= next; }
+
+		private:
+			Value v;
+			Reducer r;
+		};
 
 		template <typename VecLike>
 		__host__ __device__ inline constexpr auto MakeInsideBox(
@@ -32,34 +62,20 @@ namespace FORWARD {
 		}
 
 		template<typename VecLike>
-		__host__ __device__ inline constexpr auto IsCulledByBoxes(
+		__host__ __device__ inline constexpr bool IsCulledByBoxes(
 			VecLike p_orig,
 			VecLike const* const boxmin,
 			VecLike const* const boxmax,
 			int boxcount,
 			Operator op)
 		{
-			if (boxcount == 0)
+			if (boxcount <= 0)
 				return false;
 
 			const auto inside_box = MakeInsideBox<VecLike>(p_orig);
 			bool inside = inside_box(boxmin[0], boxmax[0]);
-			switch (op) {
-			case Operator::AND:
-				for (int i = 1; i < boxcount; ++i) {
-					inside &= inside_box(boxmin[i], boxmax[i]);
-				}
-				break;
-			case Operator::OR:
-				for (int i = 1; i < boxcount; ++i) {
-					inside |= inside_box(boxmin[i], boxmax[i]);
-				}
-				break;
-			case Operator::XOR:
-				for (int i = 1; i < boxcount; ++i) {
-					inside ^= inside_box(boxmin[i], boxmax[i]);
-				}
-				break;
+			for (int i = 1; i < boxcount; ++i) {
+				op.Reduce(inside, inside_box(boxmin[i], boxmax[i]));
 			}
 			return !inside;
 		}
