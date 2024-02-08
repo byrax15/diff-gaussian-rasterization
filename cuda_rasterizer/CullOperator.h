@@ -48,6 +48,29 @@ namespace FORWARD {
 			Value v;
 		};
 
+
+		template <typename VecLike>
+		__host__ __device__ inline static constexpr auto InsideBox(
+			VecLike const& p_orig,
+			VecLike const& min,
+			VecLike const& max) -> std::enable_if_t<std::is_arithmetic<std::decay_t<decltype(std::declval<VecLike>().x())>>::value, bool>
+		{
+			return !(
+				p_orig[0] < min[0] || p_orig[1] < min[1] || p_orig[2] < min[2] ||
+				p_orig[0] > max[0] || p_orig[1] > max[1] || p_orig[2] > max[2]);
+		}
+
+		template <typename VecLike>
+		__host__ __device__ inline static constexpr auto InsideBox(
+			VecLike const& p_orig,
+			VecLike const& min,
+			VecLike const& max) -> std::enable_if_t<std::is_arithmetic<std::decay_t<decltype(std::declval<VecLike>().x)>>::value, bool>
+		{
+			return !(
+				p_orig.x < min.x || p_orig.y < min.y || p_orig.z < min.z ||
+				p_orig.x > max.x || p_orig.y > max.y || p_orig.z > max.z);
+		} 
+
 		template <typename VecLike>
 		struct Boxes {
 			VecLike const* boxmin;
@@ -60,28 +83,6 @@ namespace FORWARD {
 				return !inside;
 			}
 		};
-
-		template <typename VecLike>
-		__host__ __device__ inline constexpr auto InsideBox(
-			VecLike const& p_orig,
-			VecLike const& min,
-			VecLike const& max) -> std::enable_if_t<std::is_member_function_pointer<decltype(&VecLike::x)>::value, bool>
-		{
-			return !(
-				p_orig.x() < min.x() || p_orig.y() < min.y() || p_orig.z() < min.z() ||
-				p_orig.x() > max.x() || p_orig.y() > max.y() || p_orig.z() > max.z());
-		}
-
-		template <typename VecLike>
-		__host__ __device__ inline constexpr auto InsideBox(
-			VecLike const& p_orig,
-			VecLike const& min,
-			VecLike const& max) -> std::enable_if_t<std::is_member_object_pointer<decltype(&VecLike::x)>::value, bool>
-		{
-			return !(
-				p_orig.x < min.x || p_orig.y < min.y || p_orig.z < min.z ||
-				p_orig.x > max.x || p_orig.y > max.y || p_orig.z > max.z);
-		}
 	}
 }
 
