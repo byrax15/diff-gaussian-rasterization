@@ -1,83 +1,87 @@
 #pragma once
 #include <array>
-#include <numeric>
+#include <functional>
 #include <type_traits>
 #include "cuda_runtime.h"
 
 namespace FORWARD {
 	namespace Cull {
-		class Operator {
-			using Reducer = void(*)(bool&, bool);
 
+		class Operator {
 		public:
 			enum Value { AND, OR, XOR };
 			static constexpr std::array<const char*, 3> Names{ "AND" , "OR", "XOR" };
 
-			__host__ __device__ constexpr Operator(Value v) : v(v), r(PickReducer()) {}
-
+			__host__ __device__ constexpr Operator(Value v) : v(v) {}
 			__host__ __device__ inline constexpr explicit operator Value() const { return v; }
 
-			__host__ __device__ inline constexpr void Reduce(bool& sum, bool next) const { return r(sum, next); }
-		private:
-			__host__ __device__ inline constexpr Reducer PickReducer() {
+			template <typename Callable>
+			__host__ __device__ inline constexpr bool Reduce(int numReductions, Callable&& next) const
+			{
+#define MAKE_APPLY(symbol) __host__ __device__ static inline constexpr bool apply(bool sum, bool next) { return sum symbol next; }
+				struct And { MAKE_APPLY(&) };
+				struct Or { MAKE_APPLY(| ) };
+				struct Xor { MAKE_APPLY(^) };
+#undef MAKE_APPLY
+
 				switch (v) {
-				case Operator::AND:
-					return ReduceAND;
-				case Operator::OR:
-					return ReduceOR;
-				case Operator::XOR:
-					return ReduceXOR;
+				case AND: return Reduce<Callable, And>(numReductions, std::forward<Callable&&>(next));
+				case OR: return Reduce<Callable, Or>(numReductions, std::forward<Callable&&>(next));
+				case XOR: return Reduce<Callable, Xor>(numReductions, std::forward<Callable&&>(next));
 				}
 			}
 
-			__host__ __device__ static inline constexpr void ReduceAND(bool& sum, bool next) { sum &= next; }
-			__host__ __device__ static inline constexpr void ReduceOR(bool& sum, bool next) { sum |= next; }
-			__host__ __device__ static inline constexpr void ReduceXOR(bool& sum, bool next) { sum ^= next; }
+		private:
+			template <typename Callable, typename Reducer>
+			__host__ __device__ inline constexpr bool Reduce(int numReductions, Callable&& next) const
+			{
+				if (numReductions <= 0)
+					return false;
+
+				auto sum = next(0);
+				for (int i = 1; i < numReductions; ++i)
+					sum = Reducer::apply(sum, next(i));
+				return sum;
+			}
 
 		private:
 			Value v;
-			Reducer r;
 		};
 
 		template <typename VecLike>
-		__host__ __device__ inline constexpr auto MakeInsideBox(
-			std::enable_if_t<std::is_arithmetic<decltype(std::declval<VecLike>().x())>::value, VecLike> const& p_orig)
+		struct Boxes {
+			VecLike const* boxmin;
+			VecLike const* boxmax;
+			int boxcount;
+
+			__host__ __device__ inline constexpr bool TryCull(VecLike const& p_orig, Operator op) const
+			{
+				const auto inside = op.Reduce(boxcount, [=](int i) { return InsideBox(p_orig, boxmin[i], boxmax[i]); });
+				return !inside;
+			}
+		};
+
+		template <typename VecLike>
+		__host__ __device__ inline constexpr auto InsideBox(
+			VecLike const& p_orig,
+			VecLike const& min,
+			VecLike const& max) -> std::enable_if_t<std::is_member_function_pointer<decltype(&VecLike::x)>::value, bool>
 		{
-			return [p_orig](VecLike const& min, VecLike const& max) {
-				return !(
-					p_orig.x() < min.x() || p_orig.y() < min.y() || p_orig.z() < min.z() ||
-					p_orig.x() > max.x() || p_orig.y() > max.y() || p_orig.z() > max.z());
-				};
+			return !(
+				p_orig.x() < min.x() || p_orig.y() < min.y() || p_orig.z() < min.z() ||
+				p_orig.x() > max.x() || p_orig.y() > max.y() || p_orig.z() > max.z());
 		}
 
 		template <typename VecLike>
-		__host__ __device__ inline constexpr auto MakeInsideBox(
-			std::enable_if_t<std::is_arithmetic<decltype(std::declval<VecLike>().x)>::value, VecLike> const& p_orig)
+		__host__ __device__ inline constexpr auto InsideBox(
+			VecLike const& p_orig,
+			VecLike const& min,
+			VecLike const& max) -> std::enable_if_t<std::is_member_object_pointer<decltype(&VecLike::x)>::value, bool>
 		{
-			return [p_orig](VecLike const& min, VecLike const& max) {
-				return !(
-					p_orig.x < min.x || p_orig.y < min.y || p_orig.z < min.z ||
-					p_orig.x > max.x || p_orig.y > max.y || p_orig.z > max.z);
-				};
-		}
-
-		template<typename VecLike>
-		__host__ __device__ inline constexpr bool IsCulledByBoxes(
-			VecLike p_orig,
-			VecLike const* const boxmin,
-			VecLike const* const boxmax,
-			int boxcount,
-			Operator op)
-		{
-			if (boxcount <= 0)
-				return false;
-
-			const auto inside_box = MakeInsideBox<VecLike>(p_orig);
-			bool inside = inside_box(boxmin[0], boxmax[0]);
-			for (int i = 1; i < boxcount; ++i) {
-				op.Reduce(inside, inside_box(boxmin[i], boxmax[i]));
-			}
-			return !inside;
+			return !(
+				p_orig.x < min.x || p_orig.y < min.y || p_orig.z < min.z ||
+				p_orig.x > max.x || p_orig.y > max.y || p_orig.z > max.z);
 		}
 	}
 }
+
