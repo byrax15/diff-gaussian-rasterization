@@ -523,19 +523,28 @@ void CudaRasterizer::Rasterizer::backward(
         (glm::vec4*)dL_drot);
 }
 
-#include <array>
+__host__ __device__ glm::vec4 qrot(glm::vec4 const* l, glm::vec4 const* r)
+{
+    using namespace glm;
+    return vec4 {
+        l->w * *(vec3*)r + l->w * *(vec3*)l + cross(*(vec3*)l, *(vec3*)r),
+        l->w * r->w * dot(*(vec3*)l, *(vec3*)r)
+    };
+}
+
 __global__ void sceneToWorldCuda(
     CudaRasterizer::Rasterizer::GaussianProperties scene_space,
     CudaRasterizer::Rasterizer::GaussianProperties world_space,
     CudaRasterizer::Rasterizer::GaussianScene scenes)
 {
-    using Color = std::array<float, (3 + 1) * (3 + 1) * 3>;
+    using Color = CudaRasterizer::Rasterizer::GaussianScene::Color;
 
     const auto i = scenes.start_index + (blockIdx.x * blockDim.x + threadIdx.x);
     reinterpret_cast<glm::vec3*>(world_space.pos_cuda)[i] = reinterpret_cast<glm::vec3*>(&scenes.position)[0] + reinterpret_cast<glm::vec3*>(scene_space.pos_cuda)[i];
     world_space.opacity_cuda[i] = scenes.opacity * scene_space.opacity_cuda[i];
 
-    reinterpret_cast<glm::vec4*>(world_space.rot_cuda)[i] = reinterpret_cast<glm::vec4*>(scene_space.rot_cuda)[i];
+    reinterpret_cast<glm::vec4*>(world_space.rot_cuda)[i] = qrot(reinterpret_cast<glm::vec4*>(&scenes.rot), reinterpret_cast<glm::vec4*>(scene_space.rot_cuda) + i);
+
     reinterpret_cast<Color*>(world_space.shs_cuda)[i] = reinterpret_cast<Color*>(scene_space.shs_cuda)[i];
     reinterpret_cast<glm::vec3*>(world_space.scale_cuda)[i] = reinterpret_cast<glm::vec3*>(scene_space.scale_cuda)[i];
 }
@@ -543,6 +552,6 @@ __global__ void sceneToWorldCuda(
 void CudaRasterizer::Rasterizer::sceneToWorldAsync(GaussianProperties scene_space, GaussianProperties world_space, GaussianScene* scenes, size_t scene_count)
 {
     for (auto s = scenes; s != scenes + scene_count; ++s) {
-        sceneToWorldCuda<<<(s->count + 255) / 256, 256>>>(scene_space, world_space, *s);
+        sceneToWorldCuda<<<(s->count + 511) / 512, 512>>>(scene_space, world_space, *s);
     }
 }
