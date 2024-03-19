@@ -88,6 +88,27 @@ public:
         float* dL_dsh,
         float* dL_dscale,
         float* dL_drot);
+
+    struct GaussianProperties {
+        float* pos_cuda {};
+        float* rot_cuda {};
+        float* scale_cuda {};
+        float* opacity_cuda {};
+        float* shs_cuda {};
+    };
+    struct GaussianScene {
+        size_t start_index {}, count {};
+        float3 position {};
+        float opacity = 1.f;
+
+        GaussianScene() = default;
+        GaussianScene(size_t start_index, size_t count)
+            : start_index(start_index)
+            , count(count)
+        {
+        }
+    };
+    static void sceneToWorldAsync(GaussianProperties scene_space, GaussianProperties world_space, GaussianScene* scenes, size_t scene_count);
 };
 };
 

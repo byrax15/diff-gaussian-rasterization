@@ -182,7 +182,6 @@ CudaRasterizer::GeometryState CudaRasterizer::GeometryState::fromChunk(char*& ch
     cub::DeviceScan::InclusiveSum(nullptr, geom.scan_size, geom.tiles_touched, geom.tiles_touched, P);
     obtain(chunk, geom.scanning_space, geom.scan_size, 128);
     obtain(chunk, geom.point_offsets, P, 128);
-    CUDA_SYNC_CHECK();
     return geom;
 }
 
@@ -203,7 +202,6 @@ CudaRasterizer::GeometryState::fromBuffers(size_t P)
     cub::DeviceScan::InclusiveSum(nullptr, geom.scan_size, geom.tiles_touched, geom.tiles_touched, P);
     cudaMalloc(&geom.scanning_space, geom.scan_size * sizeof(char));
     cudaMalloc(&geom.point_offsets, P * sizeof(uint32_t));
-    CUDA_SYNC_CHECK();
     return ug;
 }
 
@@ -213,7 +211,6 @@ CudaRasterizer::ImageState CudaRasterizer::ImageState::fromChunk(char*& chunk, s
     obtain(chunk, img.accum_alpha, N, 128);
     obtain(chunk, img.n_contrib, N, 128);
     obtain(chunk, img.ranges, N, 128);
-    CUDA_SYNC_CHECK();
     return img;
 }
 
@@ -229,7 +226,6 @@ CudaRasterizer::BinningState CudaRasterizer::BinningState::fromChunk(char*& chun
         binning.point_list_keys_unsorted, binning.point_list_keys,
         binning.point_list_unsorted, binning.point_list, P);
     obtain(chunk, binning.list_sorting_space, binning.sorting_size, 128);
-    CUDA_SYNC_CHECK();
     return binning;
 }
 
@@ -367,7 +363,6 @@ int CudaRasterizer::Rasterizer::forward(
             reinterpret_cast<const float3*>(boxmin),
             reinterpret_cast<const float3*>(boxmax),
             cullop);
-    CUDA_SYNC_CHECK();
 
     // Compute prefix sum over full list of touched tile counts by Gaussians
     // E.g., [2, 3, 0, 2, 1] -> [2, 5, 5, 7, 8]
@@ -377,7 +372,6 @@ int CudaRasterizer::Rasterizer::forward(
     // Retrieve total number of Gaussian instances to launch and resize aux buffers
     uint32_t num_rendered {};
     cudaMemcpy(&num_rendered, geomState.point_offsets + P - 1, sizeof(uint32_t), cudaMemcpyDeviceToHost);
-    CUDA_SYNC_CHECK();
     if (num_rendered == 0)
         return 0;
 
@@ -397,7 +391,6 @@ int CudaRasterizer::Rasterizer::forward(
         radii,
         tile_grid,
         (int2*)rects);
-    CUDA_SYNC_CHECK();
 
     int bit = getHigherMsb(tile_grid.x * tile_grid.y);
 
@@ -416,7 +409,6 @@ int CudaRasterizer::Rasterizer::forward(
         num_rendered,
         binningState.point_list_keys,
         imgState.ranges);
-    CUDA_SYNC_CHECK();
 
     // Let each tile blend its range of Gaussians independently in parallel
     const float* feature_ptr = colors_precomp != nullptr ? colors_precomp : geomState.rgb;
@@ -432,7 +424,6 @@ int CudaRasterizer::Rasterizer::forward(
         imgState.n_contrib,
         background,
         out_color);
-    CUDA_SYNC_CHECK_ALWAYS();
     return num_rendered;
 }
 
@@ -530,4 +521,28 @@ void CudaRasterizer::Rasterizer::backward(
         dL_dsh,
         (glm::vec3*)dL_dscale,
         (glm::vec4*)dL_drot);
+}
+
+#include <array>
+__global__ void sceneToWorldCuda(
+    CudaRasterizer::Rasterizer::GaussianProperties scene_space,
+    CudaRasterizer::Rasterizer::GaussianProperties world_space,
+    CudaRasterizer::Rasterizer::GaussianScene scenes)
+{
+    using Color = std::array<float, (3 + 1) * (3 + 1) * 3>;
+
+    const auto i = scenes.start_index + (blockIdx.x * blockDim.x + threadIdx.x);
+    reinterpret_cast<glm::vec3*>(world_space.pos_cuda)[i] = reinterpret_cast<glm::vec3*>(&scenes.position)[0] + reinterpret_cast<glm::vec3*>(scene_space.pos_cuda)[i];
+    world_space.opacity_cuda[i] = scenes.opacity * scene_space.opacity_cuda[i];
+
+    reinterpret_cast<glm::vec4*>(world_space.rot_cuda)[i] = reinterpret_cast<glm::vec4*>(scene_space.rot_cuda)[i];
+    reinterpret_cast<Color*>(world_space.shs_cuda)[i] = reinterpret_cast<Color*>(scene_space.shs_cuda)[i];
+    reinterpret_cast<glm::vec3*>(world_space.scale_cuda)[i] = reinterpret_cast<glm::vec3*>(scene_space.scale_cuda)[i];
+}
+
+void CudaRasterizer::Rasterizer::sceneToWorldAsync(GaussianProperties scene_space, GaussianProperties world_space, GaussianScene* scenes, size_t scene_count)
+{
+    for (auto s = scenes; s != scenes + scene_count; ++s) {
+        sceneToWorldCuda<<<(s->count + 255) / 256, 256>>>(scene_space, world_space, *s);
+    }
 }
