@@ -101,10 +101,10 @@ public:
 
         size_t start_index, count;
         float3 position { 0, 0, 0 };
-        float4 rot { 0, 0, 0, 1 };
+        float3 rot { 0, 0, 0 };
         float3 scale { 1, 1, 1 };
         float opacity = 1.f;
-        Color shs_cuda{};
+        // Color shs_cuda {};
 
         GaussianScene() = default;
         GaussianScene(size_t start_index, size_t count)

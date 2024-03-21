@@ -523,7 +523,8 @@ void CudaRasterizer::Rasterizer::backward(
         (glm::vec4*)dL_drot);
 }
 
-#include <glm/ext/quaternion_float.hpp>
+
+#include <glm/gtc/quaternion.hpp>
 
 __global__ void sceneToWorldCuda(
     CudaRasterizer::Rasterizer::GaussianProperties scene_space,
@@ -531,24 +532,20 @@ __global__ void sceneToWorldCuda(
     CudaRasterizer::Rasterizer::GaussianScene scenes)
 {
     using Color = CudaRasterizer::Rasterizer::GaussianScene::Color;
-
     const auto i = scenes.start_index + (blockIdx.x * blockDim.x + threadIdx.x);
-    reinterpret_cast<glm::vec3*>(world_space.pos_cuda)[i] = *reinterpret_cast<glm::vec3*>(&scenes.position) + reinterpret_cast<glm::vec3*>(scene_space.pos_cuda)[i];
+
+    const auto rot = glm::quat(glm::radians(*reinterpret_cast<glm::vec3*>(&scenes.rot)));
+    reinterpret_cast<glm::vec3*>(world_space.pos_cuda)[i] = rot * (*reinterpret_cast<glm::vec3*>(&scenes.position) + *reinterpret_cast<glm::vec3*>(&scenes.scale) * reinterpret_cast<glm::vec3*>(scene_space.pos_cuda)[i]);
+    reinterpret_cast<glm::vec4*>(world_space.rot_cuda)[i] = rot * reinterpret_cast<glm::vec4*>(scene_space.rot_cuda)[i];
+
     world_space.opacity_cuda[i] = scenes.opacity * scene_space.opacity_cuda[i];
     reinterpret_cast<glm::vec3*>(world_space.scale_cuda)[i] = *reinterpret_cast<glm::vec3*>(&scenes.scale) * reinterpret_cast<glm::vec3*>(scene_space.scale_cuda)[i];
-
-    //reinterpret_cast<glm::vec4*>(world_space.rot_cuda)[i] = reinterpret_cast<glm::quat*>(scene_space.rot_cuda)[i] * (*reinterpret_cast<glm::quat*>(&scenes.rot)) * reinterpret_cast<glm::vec3*>(world_space.pos_cuda)[i];
-    //reinterpret_cast<Color*>(world_space.shs_cuda)[i] = reinterpret_cast<Color*>(scene_space.shs_cuda)[i];
+    reinterpret_cast<Color*>(world_space.shs_cuda)[i] = reinterpret_cast<Color*>(scene_space.shs_cuda)[i];
 }
 
 void CudaRasterizer::Rasterizer::sceneToWorldAsync(GaussianProperties scene_space, GaussianProperties world_space, GaussianScene* scenes, size_t scene_count)
 {
-    size_t sum {};
     for (auto s = scenes; s != scenes + scene_count; ++s) {
         sceneToWorldCuda<<<(s->count + 511) / 512, 512>>>(scene_space, world_space, *s);
-        sum += s->count;
     }
-
-    cudaMemcpy(world_space.rot_cuda, scene_space.rot_cuda, sum * sizeof(float4), cudaMemcpyDeviceToDevice);
-    cudaMemcpy(world_space.shs_cuda, scene_space.shs_cuda, sum * sizeof(CudaRasterizer::Rasterizer::GaussianScene::Color), cudaMemcpyDeviceToDevice);
 }
