@@ -94,17 +94,14 @@ public:
         float* rot_cuda {};
         float* scale_cuda {};
         float* opacity_cuda {};
-        float* shs_cuda {};
     };
     struct GaussianScene {
-        using Color = std::array<float, (3 + 1) * (3 + 1) * 3>;
-
         size_t start_index, count;
         float3 position { 0, 0, 0 };
-        float3 rot { 0, 0, 0 };
+        float3 rot_axis { 0, 0, 0 };
+        float rot_angle = 0.f;
         float3 scale { 1, 1, 1 };
         float opacity = 1.f;
-        // Color shs_cuda {};
 
         GaussianScene() = default;
         GaussianScene(size_t start_index, size_t count)

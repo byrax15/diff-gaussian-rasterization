@@ -523,7 +523,6 @@ void CudaRasterizer::Rasterizer::backward(
         (glm::vec4*)dL_drot);
 }
 
-
 #include <glm/gtc/quaternion.hpp>
 
 __global__ void sceneToWorldCuda(
@@ -531,16 +530,16 @@ __global__ void sceneToWorldCuda(
     CudaRasterizer::Rasterizer::GaussianProperties world_space,
     CudaRasterizer::Rasterizer::GaussianScene scenes)
 {
-    using Color = CudaRasterizer::Rasterizer::GaussianScene::Color;
     const auto i = scenes.start_index + (blockIdx.x * blockDim.x + threadIdx.x);
+    const auto rot = glm::angleAxis(glm::radians(scenes.rot_angle), *reinterpret_cast<glm::vec3*>(&scenes.rot_axis));
 
-    const auto rot = glm::quat(glm::radians(*reinterpret_cast<glm::vec3*>(&scenes.rot)));
-    reinterpret_cast<glm::vec3*>(world_space.pos_cuda)[i] = rot * (*reinterpret_cast<glm::vec3*>(&scenes.position) + *reinterpret_cast<glm::vec3*>(&scenes.scale) * reinterpret_cast<glm::vec3*>(scene_space.pos_cuda)[i]);
+    reinterpret_cast<glm::vec3*>(world_space.pos_cuda)[i]
+        = rot * (*reinterpret_cast<glm::vec3*>(&scenes.position) + *reinterpret_cast<glm::vec3*>(&scenes.scale) * reinterpret_cast<glm::vec3*>(scene_space.pos_cuda)[i]);
     reinterpret_cast<glm::vec4*>(world_space.rot_cuda)[i] = rot * reinterpret_cast<glm::vec4*>(scene_space.rot_cuda)[i];
 
     world_space.opacity_cuda[i] = scenes.opacity * scene_space.opacity_cuda[i];
-    reinterpret_cast<glm::vec3*>(world_space.scale_cuda)[i] = *reinterpret_cast<glm::vec3*>(&scenes.scale) * reinterpret_cast<glm::vec3*>(scene_space.scale_cuda)[i];
-    reinterpret_cast<Color*>(world_space.shs_cuda)[i] = reinterpret_cast<Color*>(scene_space.shs_cuda)[i];
+    reinterpret_cast<glm::vec3*>(world_space.scale_cuda)[i]
+        = *reinterpret_cast<glm::vec3*>(&scenes.scale) * reinterpret_cast<glm::vec3*>(scene_space.scale_cuda)[i];
 }
 
 void CudaRasterizer::Rasterizer::sceneToWorldAsync(GaussianProperties scene_space, GaussianProperties world_space, GaussianScene* scenes, size_t scene_count)
